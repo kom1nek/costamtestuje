@@ -2,7 +2,8 @@ const WebSocket = require('ws');
 const fetch = require('node-fetch').default;
 const { XMLParser } = require('fast-xml-parser');
 
-const wss = new WebSocket.Server({ port: 8080 });
+const port = process.env.PORT || 8080; // Używamy PORT z Render lub 8080 lokalnie
+const wss = new WebSocket.Server({ port });
 const trackedLinks = [];
 
 wss.on('connection', (ws) => {
@@ -18,7 +19,7 @@ async function fetchRSS(url) {
       throw new Error(`Błąd HTTP: ${response.status} - ${response.statusText}. Odpowiedź: ${errorText.slice(0, 200)}`);
     }
     const text = await response.text();
-    console.log(`Surowa odpowiedź RSS (${url}):`, text.slice(0, 500)); // Logowanie pierwszych 500 znaków
+    console.log(`Surowa odpowiedź RSS (${url}):`, text.slice(0, 500));
     const parser = new XMLParser({ ignoreAttributes: false });
     const json = parser.parse(text);
     if (!json.rss || !json.rss.channel || !json.rss.channel.item) {
@@ -27,17 +28,16 @@ async function fetchRSS(url) {
     return json.rss.channel.item.map(item => item.link);
   } catch (error) {
     console.error(`Błąd pobierania RSS (${url}):`, error.message);
-    return []; // Zwracamy pustą tablicę w przypadku błędu
+    return [];
   }
 }
 
 async function trackSources() {
   try {
-    // Statyczna lista linków X (tymczasowo, dopóki nie znajdziemy działającego RSS)
     const xLinks = [
-      'https://x.com/elonmusk/status/1896108100220043618', // Przykład z Twoich logów
-      'https://x.com/elonmusk/status/1895901234567890123', // Fikcyjny przykład
-      'https://x.com/elonmusk/status/1895709876543210987'  // Fikcyjny przykład
+      'https://x.com/elonmusk/status/1896108100220043618',
+      'https://x.com/elonmusk/status/1895901234567890123',
+      'https://x.com/elonmusk/status/1895709876543210987'
     ];
     xLinks.forEach(link => {
       if (!trackedLinks.includes(link) && trackedLinks.length < 10) {
@@ -46,7 +46,6 @@ async function trackSources() {
       }
     });
 
-    // Śledzenie NYT (poprawny URL RSS)
     const nytLinks = await fetchRSS('https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml');
     nytLinks.forEach(link => {
       if (!trackedLinks.includes(link) && trackedLinks.length < 10) {
@@ -55,7 +54,6 @@ async function trackSources() {
       }
     });
 
-    // Wysyłanie do wszystkich klientów
     wss.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(JSON.stringify({ links: trackedLinks }));
@@ -66,6 +64,7 @@ async function trackSources() {
   }
 }
 
-// Śledzenie co 30 sekund
 setInterval(trackSources, 30000);
-trackSources(); // Start natychmiastowy
+trackSources();
+
+console.log(`Bot nasłuchuje na porcie ${port}`);
