@@ -2,7 +2,7 @@ const WebSocket = require('ws');
 const fetch = require('node-fetch').default;
 const { XMLParser } = require('fast-xml-parser');
 
-const port = process.env.PORT || 8080; // Używamy PORT z Render lub 8080 lokalnie
+const port = process.env.PORT || 8080; // Render przypisze PORT, lokalnie 8080
 const wss = new WebSocket.Server({ port });
 const trackedLinks = [];
 
